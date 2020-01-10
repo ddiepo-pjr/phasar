@@ -19,7 +19,10 @@
 
 #include <vector>
 
+#include <boost/container/flat_set.hpp>
 #include <boost/graph/adjacency_list.hpp>
+#include <map>
+#include <set>
 
 #include <llvm/IR/CallSite.h>
 
@@ -88,8 +91,6 @@ WISE_ENUM_CLASS(PointerAnalysisType, CFLSteens, CFLAnders)
  */
 class PointsToGraph {
 public:
-  // Call-graph firends
-  friend class LLVMBasedICFG;
   /**
    * 	@brief Holds the information of a vertex in the points-to graph.
    */
@@ -102,7 +103,7 @@ public:
     const llvm::Value *value = nullptr;
 
     /// Holds the llvm IR code for that vertex.
-    std::string ir_code;
+    // std::string ir_code;
 
     /**
      *  For an instruction the id is equal to the annotated id of the
@@ -123,7 +124,7 @@ public:
     const llvm::Value *value = nullptr;
 
     /// Holds the llvm IR code for that edge.
-    std::string ir_code;
+    // std::string ir_code;
 
     /**
      * For an instruction the id is equal to the annotated id of the
@@ -137,7 +138,7 @@ public:
   };
 
   /// Data structure for holding the points-to graph.
-  typedef boost::adjacency_list<boost::setS, boost::vecS, boost::undirectedS,
+  typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::undirectedS,
                                 VertexProperties, EdgeProperties>
       graph_t;
 
@@ -154,17 +155,16 @@ public:
   typedef boost::graph_traits<graph_t>::in_edge_iterator in_edge_iterator;
 
   /// Set of functions that allocate heap memory, e.g. new, new[], malloc.
-  const static std::set<std::string> HeapAllocationFunctions;
+  const static boost::container::flat_set<std::string> HeapAllocationFunctions;
 
 private:
   struct allocation_site_dfs_visitor;
   struct reachability_dfs_visitor;
-
   /// The points to graph.
   graph_t ptg;
   std::map<const llvm::Value *, vertex_t> value_vertex_map;
   /// Keep track of what has already been merged into this points-to graph.
-  std::set<std::string> ContainedFunctions;
+  boost::container::flat_set<const llvm::Function *> ContainedFunctions;
 
 public:
   /**
@@ -180,16 +180,6 @@ public:
    */
   PointsToGraph(llvm::AAResults &AA, llvm::Function *F,
                 bool onlyConsiderMustAlias = false);
-
-  /**
-   * It is used when a points-to graph is restored from the database.
-   *
-   * @brief This will create an empty points-to graph, except the functions
-   * names
-   * that are contained in the points-to graph.
-   * @param fnames Names of functions contained in the points-to graph.
-   */
-  PointsToGraph(std::vector<std::string> fnames);
 
   /**
    * @brief This will create an empty points-to graph. It is used when points-to
@@ -269,7 +259,7 @@ public:
   void mergeWith(const PointsToGraph &Other,
                  const std::vector<std::pair<llvm::ImmutableCallSite,
                                              const llvm::Function *>> &Calls);
-  void mergeWith(PointsToGraph &Other, llvm::ImmutableCallSite CS,
+  void mergeWith(PointsToGraph &Other, const llvm::ImmutableCallSite &CS,
                  const llvm::Function *F);
 
   /**
@@ -303,6 +293,11 @@ public:
    * @brief NOT YET IMPLEMENTED
    */
   json getAsJson();
+
+private:
+  void mergeGraph(const PointsToGraph &Other);
+  void mergeCallSite(const llvm::ImmutableCallSite &CS,
+                     const llvm::Function *F);
 };
 
 } // namespace psr

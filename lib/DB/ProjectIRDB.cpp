@@ -221,6 +221,7 @@ void ProjectIRDB::preprocessModule(llvm::Module *M) {
   // Obtain the very important alias analysis results
   // and construct the intra-procedural points-to graphs.
   REG_COUNTER("GS Pointer", 0, PAMM_SEVERITY_LEVEL::Core)
+
   for (auto &F : *M) {
     // When module-wise analysis is performed, declarations might occure
     // causing meaningless points-to graphs to be produced.
@@ -233,7 +234,9 @@ void ProjectIRDB::preprocessModule(llvm::Module *M) {
       // The problem comes from the generation of PtG which is far too slow
       // due to the use of llvmIRToString (without it, the generation of PtG is
       // very acceptable)
-      insertPointsToGraph(F.getName().str(), new PointsToGraph(AARes, &F));
+      ptgs.insert(std::make_pair(
+          F.getName().str(),
+          std::unique_ptr<PointsToGraph>(new PointsToGraph(AARes, &F))));
     }
   }
   STOP_TIMER("PTG Construction", PAMM_SEVERITY_LEVEL::Core);
@@ -362,44 +365,42 @@ bool ProjectIRDB::containsSourceFile(const std::string &src) {
 }
 
 llvm::LLVMContext *ProjectIRDB::getLLVMContext(const std::string &name) {
-  if (contexts.count(name))
-    return contexts[name].get();
-  return nullptr;
+  auto contextItr = contexts.find(name);
+  return contextItr == contexts.end() ? nullptr : contextItr->second.get();
 }
 
 llvm::Module *ProjectIRDB::getModule(const std::string &name) {
-  if (modules.count(name))
-    return modules[name].get();
-  return nullptr;
+  auto moduleItr = modules.find(name);
+  return moduleItr == modules.end() ? nullptr : moduleItr->second.get();
 }
 
 std::size_t ProjectIRDB::getNumberOfModules() { return modules.size(); }
 
 llvm::Module *ProjectIRDB::getModuleDefiningFunction(const std::string &name) {
-  if (functionToModuleMap.count(name)) {
-    return modules[functionToModuleMap[name]].get();
-  }
-  return nullptr;
+  auto moduleItr = functionToModuleMap.find(name);
+  return moduleItr == functionToModuleMap.end()
+             ? nullptr
+             : modules[moduleItr->second].get();
 }
 
 llvm::Function *ProjectIRDB::getFunction(const std::string &name) {
-  if (functionToModuleMap.count(name))
-    return modules[functionToModuleMap[name]]->getFunction(name);
-  return nullptr;
+  auto modulePtr(getModuleDefiningFunction(name));
+  return modulePtr ? modulePtr->getFunction(name) : nullptr;
 }
 
 llvm::GlobalVariable *ProjectIRDB::getGlobalVariable(const std::string &name) {
-  if (globals.count(name))
-    return modules[globals[name]]->getGlobalVariable(name);
-  return nullptr;
+  auto moduleItr = globals.find(name);
+  return moduleItr == globals.end()
+             ? nullptr
+             : modules[moduleItr->second]->getGlobalVariable(name);
 }
 
 std::set<std::string> ProjectIRDB::getAllSourceFiles() { return source_files; }
 
 llvm::Instruction *ProjectIRDB::getInstruction(std::size_t id) {
-  if (instructions.count(id))
-    return instructions[id];
-  return nullptr;
+  auto instructionItr = instructions.find(id);
+  return instructionItr == instructions.end() ? nullptr
+                                              : instructionItr->second;
 }
 
 std::size_t ProjectIRDB::getInstructionID(const llvm::Instruction *I) {
@@ -411,16 +412,9 @@ std::size_t ProjectIRDB::getInstructionID(const llvm::Instruction *I) {
   return id;
 }
 
-PointsToGraph *ProjectIRDB::getPointsToGraph(const std::string &name) {
-  if (ptgs.count(name))
-    return ptgs[name].get();
-  return nullptr;
-}
-
 PointsToGraph *ProjectIRDB::getPointsToGraph(const std::string &name) const {
-  if (ptgs.count(name))
-    return ptgs.at(name).get();
-  return nullptr;
+  auto ptgItr = ptgs.find(name);
+  return ptgItr == ptgs.end() ? nullptr : ptgItr->second.get();
 }
 
 void ProjectIRDB::print() {
@@ -525,12 +519,6 @@ const llvm::Value *ProjectIRDB::persistedStringToValue(const std::string &S) {
   return nullptr;
 }
 
-void ProjectIRDB::insertPointsToGraph(const std::string &FunctionName,
-                                      PointsToGraph *ptg) {
-  ptgs.insert(
-      std::make_pair(FunctionName, std::unique_ptr<PointsToGraph>(ptg)));
-}
-
 std::set<const llvm::Value *> ProjectIRDB::getAllocaInstructions() {
   return alloca_instructions;
 }
@@ -576,14 +564,6 @@ void ProjectIRDB::insertModule(std::unique_ptr<llvm::Module> M) {
 
 set<const llvm::Type *> ProjectIRDB::getAllocatedTypes() {
   return allocated_types;
-}
-
-string
-ProjectIRDB::getGlobalVariableModuleName(const string &GlobalVariableName) {
-  if (globals.count(GlobalVariableName)) {
-    return globals[GlobalVariableName];
-  }
-  return "";
 }
 
 set<const llvm::Value *> ProjectIRDB::getAllMemoryLocations() {

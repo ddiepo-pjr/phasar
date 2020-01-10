@@ -56,14 +56,6 @@ private:
   ProjectIRDB &IRDB;
   PointsToGraph WholeModulePTG;
   std::unordered_set<const llvm::Function *> VisitedFunctions;
-  /// Keeps track of the call-sites already resolved
-  // std::vector<const llvm::Instruction *> CallStack;
-
-  // Keeps track of the type graph already constructed
-  // TypeGraph_t typegraph;
-
-  // Any types that could be initialized outside of the module
-  // std::set<const llvm::StructType*> unsound_types;
 
   // The VertexProperties for our call-graph.
   struct VertexProperties {
@@ -77,16 +69,15 @@ private:
   // The EdgeProperties for our call-graph.
   struct EdgeProperties {
     const llvm::Instruction *callsite = nullptr;
-    std::string ir_code;
+    // std::string ir_code;
     size_t id = 0;
     EdgeProperties() = default;
     EdgeProperties(const llvm::Instruction *i);
   };
 
   /// Specify the type of graph to be used.
-  typedef boost::adjacency_list<boost::multisetS, boost::vecS,
-                                boost::bidirectionalS, VertexProperties,
-                                EdgeProperties>
+  typedef boost::adjacency_list<boost::vecS, boost::vecS, boost::bidirectionalS,
+                                VertexProperties, EdgeProperties>
       bidigraph_t;
 
   // Let us have some handy typedefs.
@@ -99,10 +90,11 @@ private:
   /// The call graph.
   bidigraph_t cg;
 
-  /// Maps function names to the corresponding vertex id.
-  std::unordered_map<std::string, vertex_t> function_vertex_map;
+  /// Maps functions to the corresponding vertex id.
+  std::unordered_map<const llvm::Function *, vertex_t> function_vertex_map;
 
-  void constructionWalker(const llvm::Function *F, Resolver *resolver);
+  void constructionWalker(const llvm::Function *F, Resolver *resolver,
+                          bool isRecursiveCall);
 
   struct dependency_visitor;
 

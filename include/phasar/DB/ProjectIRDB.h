@@ -136,13 +136,9 @@ public:
   llvm::Function *getFunction(const std::string &FunctionName);
   llvm::GlobalVariable *
   getGlobalVariable(const std::string &GlobalVariableName);
-  std::string
-  getGlobalVariableModuleName(const std::string &GlobalVariableName);
   llvm::Instruction *getInstruction(std::size_t id);
   std::size_t getInstructionID(const llvm::Instruction *I);
-  PointsToGraph *getPointsToGraph(const std::string &FunctionName);
   PointsToGraph *getPointsToGraph(const std::string &FunctionName) const;
-  void insertPointsToGraph(const std::string &FunctionName, PointsToGraph *ptg);
   void print();
   void exportPATBCJSON();
   /**
