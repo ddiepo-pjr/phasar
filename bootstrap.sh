@@ -5,7 +5,7 @@ set -e
 
 # Get the directory where this script lives.
 readonly PHASAR_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-readonly LLVM_INSTALL="/usr/local/llvm-8"
+readonly LLVM_INSTALL="/usr/local/llvm-9"
 
 
 BOOST_INSTALL=""
@@ -70,8 +70,8 @@ fi
 echo "Using boost from: ${BOOST_INSTALL}"
 
 echo "Installing LLVM..."
-tmp_dir=`mktemp -d "llvm-8_build.XXXXXXXX" --tmpdir`
-./utils/install-llvm-8.0.0.sh $(nproc) "${tmp_dir}" "${LLVM_INSTALL}"
+tmp_dir=`mktemp -d "llvm-9_build.XXXXXXXX" --tmpdir`
+./utils/install-llvm-9.0.0.sh $(nproc) "${tmp_dir}" "${LLVM_INSTALL}"
 rm -rf ${tmp_dir}
 
 echo "Installing WLLVM..."
@@ -89,7 +89,7 @@ export CXX=${LLVM_INSTALL}/bin/clang++
 
 mkdir -p ${PHASAR_DIR}/build
 cd ${PHASAR_DIR}/build
-cmake -DCMAKE_BUILD_TYPE=Release -DBOOST_ROOT=${BOOST_INSTALL} -DPHASAR_BUILD_UNITTESTS=${DO_UNIT_TEST} ${PHASAR_DIR}
+cmake -DCMAKE_BUILD_TYPE=Debug -DBOOST_ROOT=${BOOST_INSTALL} -DPHASAR_BUILD_UNITTESTS=${DO_UNIT_TEST} ${PHASAR_DIR}
 
 make -j $(nproc)
 echo "PhASAR built successfully."
