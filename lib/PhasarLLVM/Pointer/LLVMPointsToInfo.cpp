@@ -447,17 +447,17 @@ nlohmann::json LLVMPointsToInfo::getAsJson() const { return ""_json; }
 
 PointsToGraph *
 LLVMPointsToInfo::getPointsToGraph(const llvm::Function *F) const {
-  if (PointsToGraphs.count(F)) {
-    return PointsToGraphs.at(F).get();
-  }
-  return nullptr;
+  const auto& iterator = PointsToGraphs.find(F);
+  if (iterator == PointsToGraphs.end())
+    return nullptr;
+  return iterator->second.get();
 }
 
 llvm::AAResults *LLVMPointsToInfo::getAAResults(const llvm::Function *F) const {
-  if (AAInfos.count(F)) {
-    return AAInfos.at(F);
-  }
-  return nullptr;
+  const auto& iterator = AAInfos.find(F);
+  if (iterator == AAInfos.end())
+    return nullptr;
+  return iterator->second;
 }
 
 } // namespace psr
