@@ -27,6 +27,13 @@
 #include <phasar/PhasarLLVM/Pointer/LLVMPointsToGraph.h>
 #include <phasar/PhasarLLVM/Pointer/LLVMPointsToInfo.h>
 
+#define useThreadsInPTG
+#ifdef useThreadsInPTG
+#include <thread>
+#include <future>
+#include <boost/circular_buffer.hpp>
+#endif
+
 using namespace psr;
 
 namespace psr {
@@ -125,6 +132,38 @@ LLVMPointsToInfo::LLVMPointsToInfo(ProjectIRDB &IRDB, PointerAnalysisType PAT) {
   llvm::FunctionPassManager FPM;
   // Always verify the input.
   FPM.addPass(llvm::VerifierPass());
+
+#ifdef useThreadsInPTG
+  const unsigned int threadCount = std::thread::hardware_concurrency();
+  typedef std::pair<llvm::Function*, PointsToGraph*> funcGraphPair;
+  boost::circular_buffer<std::shared_future<funcGraphPair>> futures(threadCount);
+  for (llvm::Module *M : IRDB.getAllModules()) {
+    for (auto &F : *M) {
+      if (F.isDeclaration()) continue;
+      llvm::PreservedAnalyses PA = FPM.run(F, FAM);
+      llvm::AAResults &AAR = FAM.getResult<llvm::AAManager>(F);
+      AAInfos.insert(std::make_pair(&F, &AAR));
+      if (futures.full())
+      {
+        const auto& result = futures.front().get();
+        PointsToGraphs.insert(std::make_pair(
+            result.first, std::unique_ptr<PointsToGraph>(result.second)));
+        futures.pop_front();
+      }
+      futures.push_back(std::async(std::launch::async, [&] (llvm::Function* func, llvm::AAResults* AAR) {
+        return std::make_pair(func, new PointsToGraph(func, *AAR));
+      }, &F, &AAR));
+
+    }
+  }
+  while (!futures.empty()) {
+    const auto& result = futures.front().get();
+    PointsToGraphs.insert(std::make_pair(
+        result.first, std::unique_ptr<PointsToGraph>(result.second)));
+    futures.pop_front();
+  }
+#else
+
   for (llvm::Module *M : IRDB.getAllModules()) {
     for (auto &F : *M) {
       if (!F.isDeclaration()) {
@@ -132,10 +171,12 @@ LLVMPointsToInfo::LLVMPointsToInfo(ProjectIRDB &IRDB, PointerAnalysisType PAT) {
         llvm::AAResults &AAR = FAM.getResult<llvm::AAManager>(F);
         AAInfos.insert(std::make_pair(&F, &AAR));
         PointsToGraphs.insert(std::make_pair(
-            &F, std::make_unique<PointsToGraph>(&F, *AAInfos.at(&F))));
+            &F, std::make_unique<PointsToGraph>(&F, AAR)));
       }
     }
   }
+#endif
+
 }
 
 AliasResult LLVMPointsToInfo::alias(const llvm::Value *V1,
