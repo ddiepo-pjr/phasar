@@ -52,6 +52,8 @@ void OTFResolver::handlePossibleTargets(
     // Do the merge of the points-to graphs for all possible targets, but
     // only if they are available
     if (!CalleeTarget->isDeclaration()) {
+      auto CalleePTG = PT.getPointsToGraph(CalleeTarget);
+      WholeModulePTG.mergeWith(CalleePTG, CalleeTarget);
       WholeModulePTG.mergeCallSite(CS, CalleeTarget);
     }
   }

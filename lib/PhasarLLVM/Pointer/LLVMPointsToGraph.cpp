@@ -199,15 +199,12 @@ PointsToGraph::PointsToGraph(llvm::Function *F, llvm::AAResults &AA) {
   INC_COUNTER("GS Pointer", Pointers.size(), PAMM_SEVERITY_LEVEL::Core);
 
   // make vertices for all pointers
-  ValueVertexMapT pointersMap; // To reduce the map used for the next loop...
-  for (auto Pointer : Pointers) {
-    auto newVertex = boost::add_vertex(VertexProperties(Pointer), PAG);
-    ValueVertexMap[Pointer] = newVertex;
-    pointersMap[Pointer] = newVertex;
+  for (auto Ptr : Pointers) {
+    ValueVertexMap[Ptr] = boost::add_vertex(VertexProperties(Ptr), PAG);
   }
   // iterate over the worklist, and run the full (n^2)/2 disambiguations
-  const auto mapEnd = pointersMap.end();
-  for (auto I1 = pointersMap.begin(); I1 != mapEnd; ++I1) {
+  const auto mapEnd = ValueVertexMap.end();
+  for (auto I1 = ValueVertexMap.begin(); I1 != mapEnd; ++I1) {
     llvm::Type *I1ElTy =
         llvm::cast<llvm::PointerType>(I1->first->getType())->getElementType();
     const uint64_t I1Size = I1ElTy->isSized() ? DL.getTypeStoreSize(I1ElTy)
