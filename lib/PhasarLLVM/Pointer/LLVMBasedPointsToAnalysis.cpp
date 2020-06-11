@@ -27,7 +27,49 @@
 #include "phasar/PhasarLLVM/Pointer/LLVMBasedPointsToAnalysis.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMPointsToUtils.h"
 
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+
 using namespace psr;
+
+namespace {
+
+int parseLine(char* line){
+    // This assumes that a digit will be found and the line ends in " Kb".
+    int i = strlen(line);
+    const char* p = line;
+    while (*p <'0' || *p > '9') p++;
+    line[i-3] = '\0';
+    i = atoi(p);
+    return i;
+}
+
+void printMemUsage(std::ostream &OS) {
+  FILE* file = fopen("/proc/self/status", "r");
+  int result = -1;
+  char line[128];
+  bool gotVSS=false;
+  bool gotRSS=false;
+
+  while (fgets(line, 128, file) != NULL){
+      if (strncmp(line, "VmSize:", 7) == 0){
+          result = parseLine(line);
+          OS << " VSS: " << result << " kB";
+          gotVSS = true;
+          if (gotRSS) break;
+      }
+      if (strncmp(line, "VmRSS:", 6) == 0){
+          result = parseLine(line);
+          OS << " RSS: " << result << " kB";
+          gotRSS = true;
+          if (gotVSS) break;
+      }
+  }
+  fclose(file);
+}
+}
 
 namespace psr {
 
@@ -85,7 +127,11 @@ bool LLVMBasedPointsToAnalysis::hasPointsToInfo(
 }
 
 void LLVMBasedPointsToAnalysis::computePointsToInfo(llvm::Function &Fun) {
-  llvm::PreservedAnalyses PA = FPM.run(Fun, FAM);
+  //llvm::PreservedAnalyses PA = FPM.run(Fun, FAM);
+
+  std::cout << "Computing points to for: " << Fun.getName().str();
+  printMemUsage(std::cout);
+  std::cout << std::endl;
   llvm::AAResults &AAR = FAM.getResult<llvm::AAManager>(Fun);
   AAInfos.insert(std::make_pair(&Fun, &AAR));
 }
@@ -97,8 +143,15 @@ void LLVMBasedPointsToAnalysis::erase(const llvm::Function *F) {
 }
 
 void LLVMBasedPointsToAnalysis::clear() {
+  std::cout << "Clearing PTA. Before:";
+  printMemUsage(std::cout);
+
   AAInfos.clear();
   FAM.clear();
+
+  std::cout << ", After:";
+  printMemUsage(std::cout);
+  std::cout << std::endl;
 }
 
 LLVMBasedPointsToAnalysis::LLVMBasedPointsToAnalysis(ProjectIRDB &IRDB,

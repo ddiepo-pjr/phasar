@@ -35,16 +35,15 @@ namespace psr {
 class LLVMPointsToSet : public LLVMPointsToInfo {
 private:
   LLVMBasedPointsToAnalysis PTA;
-  std::unordered_set<const llvm::Function *> AnalyzedFunctions;
   std::unordered_map<const llvm::Value *,
                      std::shared_ptr<std::unordered_set<const llvm::Value *>>>
       PointsToSets;
 
-  void computePointsToSet(const llvm::Value *V);
+  void computePointsToSet(const llvm::Value& V);
 
-  void computePointsToSet(const llvm::GlobalVariable *G);
+  void computePointsToSet(const llvm::GlobalVariable& G);
 
-  void computePointsToSet(llvm::Function *F);
+  void computePointsToSet(const llvm::Value& V, llvm::Function& F);
 
 public:
   /**
