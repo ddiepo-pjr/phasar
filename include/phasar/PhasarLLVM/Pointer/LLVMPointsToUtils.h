@@ -26,6 +26,8 @@ namespace psr {
  */
 bool isInterestingPointer(const llvm::Value *V);
 
+std::pair<unsigned long, unsigned long> getRssAndVss();
+
 extern const std::set<llvm::StringRef> HeapAllocatingFunctions;
 
 } // namespace psr

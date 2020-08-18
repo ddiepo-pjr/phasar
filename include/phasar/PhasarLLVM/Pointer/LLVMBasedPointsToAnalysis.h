@@ -45,7 +45,7 @@ private:
 public:
   LLVMBasedPointsToAnalysis(
       ProjectIRDB &IRDB, bool UseLazyEvaluation = true,
-      PointerAnalysisType PATy = PointerAnalysisType::CFLAnders);
+      PointerAnalysisType PATy = PointerAnalysisType::CFLSteens);
 
   ~LLVMBasedPointsToAnalysis() = default;
 

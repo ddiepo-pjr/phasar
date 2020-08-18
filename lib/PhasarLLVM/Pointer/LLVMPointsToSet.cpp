@@ -21,6 +21,8 @@
 #include "llvm/IR/Module.h"
 #include "llvm/IR/Value.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/raw_os_ostream.h"
+
 
 #include "phasar/DB/ProjectIRDB.h"
 #include "phasar/PhasarLLVM/Pointer/LLVMBasedPointsToAnalysis.h"
@@ -83,6 +85,8 @@ void LLVMPointsToSet::computePointsToSet(const llvm::GlobalVariable& G) {
   std::cout << std::endl;
 }
 
+#define ONLY_FUNC_PTRS 1
+
 void LLVMPointsToSet::computePointsToSet(const llvm::Value& V, llvm::Function& F) {
 
   std::shared_ptr<std::unordered_set<const llvm::Value *>> set =
@@ -92,25 +96,35 @@ void LLVMPointsToSet::computePointsToSet(const llvm::Value& V, llvm::Function& F
     return;
   }
 
+  if (!V.getType()->isPointerTy()) {
+    llvm::raw_os_ostream err(std::cerr);
+    err << "Trying to compute points-to for non pointer type: " << V.getName();
+    V.getType()->print(err);
+    err << "\n";
+    return;
+  }
+
   LOG_IF_ENABLE(BOOST_LOG_SEV(lg::get(), DEBUG)
                 << "Analyzing function: " << F.getName().str());
 
-  llvm::AAResults &AA = *PTA.getAAResults(&F);
-  bool EvalAAMD = true;
-
   // taken from llvm/Analysis/AliasAnalysisEvaluator.cpp
-  const llvm::DataLayout &DL = F.getParent()->getDataLayout();
-
   llvm::SetVector<llvm::Value *> Pointers;
-
   for (auto &I : F.args()) {
-    if (I.getType()->isPointerTy()) { // Add all pointer arguments.
+    if (I.getType()->isPointerTy()
+#ifdef ONLY_FUNC_PTRS
+        && I.getType()->getPointerElementType()->isFunctionTy()
+#endif
+        ) { // Add all pointer arguments.
       Pointers.insert(&I);
     }
   }
 
   for (llvm::inst_iterator I = inst_begin(F), E = inst_end(F); I != E; ++I) {
-    if (I->getType()->isPointerTy()) { // Add all pointer instructions.
+    if (I->getType()->isPointerTy()
+#ifdef ONLY_FUNC_PTRS
+        && I->getType()->getPointerElementType()->isFunctionTy()
+#endif
+        ) { // Add all pointer instructions.
       Pointers.insert(&*I);
     }
     llvm::Instruction &Inst = *I;
@@ -122,7 +136,11 @@ void LLVMPointsToSet::computePointsToSet(const llvm::Value& V, llvm::Function& F
       }
       // Consider formals.
       for (llvm::Use &DataOp : Call->data_ops()) {
-        if (isInterestingPointer(DataOp)) {
+        if (isInterestingPointer(DataOp)
+#ifdef ONLY_FUNC_PTRS
+// Don't filter out non-functions here, as that breaks the ability to distinguish virtual function invokes.
+#endif
+            ) {
           Pointers.insert(DataOp);
         }
       }
@@ -131,23 +149,42 @@ void LLVMPointsToSet::computePointsToSet(const llvm::Value& V, llvm::Function& F
       for (llvm::Instruction::op_iterator OI = Inst.op_begin(),
                                           OE = Inst.op_end();
            OI != OE; ++OI) {
-        if (isInterestingPointer(*OI)) {
+        if (isInterestingPointer(*OI)
+#ifdef ONLY_FUNC_PTRS
+        && (*OI)->getType()->getPointerElementType()->isFunctionTy()
+#endif
+            ) {
           Pointers.insert(*OI);
         }
       }
     }
   }
+  std::cout << F.getName().str() << " pointer count: " << Pointers.size() << std::endl;
 
+  const llvm::DataLayout &DL = F.getParent()->getDataLayout();
   llvm::Type *inputType =
       llvm::cast<llvm::PointerType>(V.getType())->getElementType();
   const uint64_t inputSize = inputType->isSized()
                               ? DL.getTypeStoreSize(inputType)
                               : llvm::MemoryLocation::UnknownSize;
 
+  size_t aliasCount = 0;
+
+  llvm::AAResults* AA = PTA.getAAResults(&F);
+  const auto PointsToSetsEnd = PointsToSets.end();
   for (llvm::Value* valPtr : Pointers)
   {
     if (valPtr == &V)
       continue;
+
+    auto search = PointsToSets.find(valPtr);
+    if (search != PointsToSetsEnd)
+    {
+      if (search->second.get()->count(&V)) {
+        set->insert(valPtr);
+      }
+      continue;
+    }
 
     llvm::Type *I1ElTy =
         llvm::cast<llvm::PointerType>(valPtr->getType())->getElementType();
@@ -155,7 +192,7 @@ void LLVMPointsToSet::computePointsToSet(const llvm::Value& V, llvm::Function& F
                                 ? DL.getTypeStoreSize(I1ElTy)
                                 : llvm::MemoryLocation::UnknownSize;
 
-    switch (AA.alias(&V, inputSize, valPtr, I1Size)) {
+    switch (AA->alias(&V, inputSize, valPtr, I1Size)) {
       case llvm::NoAlias:
         break;
       case llvm::MayAlias:
@@ -165,6 +202,15 @@ void LLVMPointsToSet::computePointsToSet(const llvm::Value& V, llvm::Function& F
       case llvm::MustAlias: {
         set->insert(valPtr);
       }
+    }
+    ++aliasCount;
+    auto memUsage = psr::getRssAndVss();
+    const unsigned long oneHundredGigabytes = 100 * 1024 * 1024;
+    const unsigned long fiftyGigabytes = 50 * 1024 * 1024;
+    if (memUsage.first > fiftyGigabytes || memUsage.second > oneHundredGigabytes) {
+      std::cout << "*** RESETTING.  VSS: " << memUsage.second << "kb, RSS:" << memUsage.first << ", count: " << aliasCount << std::endl;
+      PTA.clear();
+      AA = PTA.getAAResults(&F);
     }
   }
   PTA.clear();

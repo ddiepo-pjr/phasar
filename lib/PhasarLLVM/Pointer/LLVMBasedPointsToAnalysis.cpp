@@ -36,39 +36,39 @@ using namespace psr;
 
 namespace {
 
-int parseLine(char* line){
-    // This assumes that a digit will be found and the line ends in " Kb".
-    int i = strlen(line);
-    const char* p = line;
-    while (*p <'0' || *p > '9') p++;
-    line[i-3] = '\0';
-    i = atoi(p);
-    return i;
+//unsigned long parseLine(char* line){
+//    // This assumes that a digit will be found and the line ends in " Kb".
+//    size_t i = strlen(line);
+//    const char* p = line;
+//    while (*p <'0' || *p > '9') p++;
+//    line[i-3] = '\0';
+//    return std::stoul(p);
+//}
+//
+//std::pair<unsigned long, unsigned long> getRssAndVss() {
+//  FILE* file = fopen("/proc/self/status", "r");
+//  int result = -1;
+//  char line[128];
+//
+//  std::pair<unsigned long, unsigned long> rssAndVss = std::make_pair(0, 0);
+//  while (fgets(line, 128, file) != NULL){
+//      if (strncmp(line, "VmSize:", 7) == 0) {
+//          rssAndVss.second = parseLine(line);
+//          if (rssAndVss.first) break;
+//      }
+//      if (strncmp(line, "VmRSS:", 6) == 0) {
+//          rssAndVss.first = parseLine(line);
+//          if (rssAndVss.second) break;
+//      }
+//  }
+//  fclose(file);
+//  return rssAndVss;
 }
 
 void printMemUsage(std::ostream &OS) {
-  FILE* file = fopen("/proc/self/status", "r");
-  int result = -1;
-  char line[128];
-  bool gotVSS=false;
-  bool gotRSS=false;
-
-  while (fgets(line, 128, file) != NULL){
-      if (strncmp(line, "VmSize:", 7) == 0){
-          result = parseLine(line);
-          OS << " VSS: " << result << " kB";
-          gotVSS = true;
-          if (gotRSS) break;
-      }
-      if (strncmp(line, "VmRSS:", 6) == 0){
-          result = parseLine(line);
-          OS << " RSS: " << result << " kB";
-          gotRSS = true;
-          if (gotVSS) break;
-      }
-  }
-  fclose(file);
-}
+  auto rssAndVss = psr::getRssAndVss();
+  OS << " VSS: " << rssAndVss.second << " kB"
+     << " RSS: " << rssAndVss.first << " kB";
 }
 
 namespace psr {

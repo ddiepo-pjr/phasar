@@ -105,7 +105,7 @@ LLVMBasedICFG::LLVMBasedICFG(ProjectIRDB &IRDB, CallGraphAnalysisType CGType,
   if (!PT && (CGType == CallGraphAnalysisType::OTF)) {
     // no pointer information provided by the user,
     // we need to construct a points-to infos ourselfes
-    this->PT = new LLVMPointsToSet(IRDB);
+    this->PT = new LLVMPointsToSet(IRDB, true, PointerAnalysisType::CFLSteens);
     UserPTInfos = false;
   }
   // instantiate the respective resolver type

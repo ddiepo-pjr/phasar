@@ -125,7 +125,7 @@ public:
    * considered.
    */
   LLVMPointsToGraph(ProjectIRDB &IRDB, bool UseLazyEvaluation = true,
-                    PointerAnalysisType PATy = PointerAnalysisType::CFLAnders);
+                    PointerAnalysisType PATy = PointerAnalysisType::CFLSteens);
 
   ~LLVMPointsToGraph() override = default;
 

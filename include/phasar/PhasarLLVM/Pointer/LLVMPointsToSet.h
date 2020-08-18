@@ -56,7 +56,7 @@ public:
    * considered. False, if May and Must Aliases should be considered.
    */
   LLVMPointsToSet(ProjectIRDB &IRDB, bool UseLazyEvaluation = true,
-                  PointerAnalysisType PATy = PointerAnalysisType::CFLAnders);
+                  PointerAnalysisType PATy = PointerAnalysisType::CFLSteens);
 
   ~LLVMPointsToSet() override = default;
 
